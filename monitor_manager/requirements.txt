@@ -1,0 +1,6 @@
+docker
+httpx
+requests
+m3u8
+python-dotenv
+timeout-decorator

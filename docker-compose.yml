@@ -1,0 +1,88 @@
+services:
+  postgres_db:
+    image: postgres:17.3
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: channeldb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d channeldb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+
+  database_service:
+    build: ./database_service
+    container_name: database_service
+    ports:
+      - "5001:5000"
+    environment:
+      DB_HOST: postgres_db
+      DB_NAME: channeldb
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+
+  monitor_manager:
+    build: ./monitor_manager
+    container_name: monitor_manager
+    environment:
+      - DATABASE_SERVICE_URL=${DATABASE_SERVICE_URL}
+      - DOCKER_NETWORK=${DOCKER_NETWORK}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      database_service:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: always
+    stop_grace_period: 30s
+    stop_signal: SIGINT
+
+  monitor_service:
+    build: ./monitor_service
+    image: monitor_service_image
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - backend
+    depends_on:
+      database_service:
+        condition: service_healthy
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  db_data:

@@ -1,0 +1,133 @@
+Microservice-struktur
+    Monitor Service (Huvudkomponent)
+        Ansvarar för att hämta segment och analysera kanalstatus.
+        Körs som en asynkron tjänst som schemalagt kontrollerar kanaler.
+        Kan skala genom att starta flera instanser, där varje instans övervakar en eller flera kanaler.
+    API Gateway / Dashboard Service
+        REST API för att lägga till, ta bort och hantera kanaler som ska övervakas.
+        Presenterar data till dashboarden.
+        Kan använda FastAPI (Python) eller Express.js (Node.js).
+    Database Service
+        Lagrar kanalstatus, svarstider och historik.
+        PostgreSQL eller MongoDB beroende på databehov.
+        Alternativt Redis om du bara behöver snabb lagring av senaste status.
+    Notification Service (valfri)
+        Skickar notiser via Slack, e-post eller webhooks vid problem.
+        Kan vara en separat container som prenumererar på felmeddelanden.
+
+
+Hur körs varje kanal?
+    Varje kanal kan köras i en egen container om du vill ha hög skalbarhet.
+    Alternativt kan en Monitor Service hantera flera kanaler parallellt och spridas ut på olika instanser via Kubernetes eller Docker Swarm.
+    Använd RabbitMQ eller Kafka om du vill skicka kanalstatus mellan tjänster.
+
+Exempel på hur det skulle fungera i molnet
+    En API-anrop lägger till en ny kanal i systemet
+        API Gateway tar emot och sparar den i databasen.
+        En Monitor Service-plats upptäcker att en ny kanal behöver övervakas.
+    Monitor Service startar en process för att övervaka kanalen
+        Laddar manifestet och börjar kontrollera segment.
+    Status rapporteras tillbaka till API och Dashboard
+        Dashboard visar grön, gul eller röd status.
+        Om fel upptäcks kan Notification Service skicka en varning.
+
+
+
+Struktur för Monitor Service
+Vi vill att tjänsten:
+
+    Läser in en HLS-kanal-URL och hämtar dess M3U8-manifest.
+    Parsar manifestet och identifierar alla kvalitetsnivåer.
+    Hämtar segmenten för att mäta svarstid och upptäcka problem.
+    Returnerar en status: ✅ Grön, ⚠️ Gul, ❌ Röd.
+
+Vald teknologi
+    Python (snabb utveckling, bra HTTP-stöd).
+    httpx (asynkron HTTP-klient).
+    m3u8 (för att tolka HLS-manifest).
+    asyncio (för parallella HTTP-anrop).
+    Logging istället för print (för framtida Docker-kompatibilitet).
+    Config via miljövariabler (för att underlätta Docker senare).
+
+
+
+✅ Lägga till fler funktioner
+
+📊 Spara status i en loggfil eller databas
+🔄 Göra så att monitoringen körs kontinuerligt
+🚨 Skicka varningar vid fel (Slack, e-post, webhookar)
+🖥 Bygga en dashboard som visar status i realtid
+
+
+
+PostgreSQL databas för konfiguration och kanallista
+Usr: boris
+pwd: Serpa11!
+172.232.131.169:10522
+database: monitor
+
+
+Tänkt filstruktur för micro services:
+hls-monitor/
+│── monitor_service/       # HLS-monitoreringstjänsten
+│   ├── monitor.py         # Huvudlogik för att monitorera kanaler
+│   ├── Dockerfile         # Dockerfile för denna tjänst
+│   ├── requirements.txt   # Python dependencies
+│   ├── __init__.py        # Gör mappen till en Python-modul
+│
+│── notifier_service/      # Notifieringstjänsten (Slack, e-post etc.)
+│   ├── notifier.py        # Hanterar notifieringar
+│   ├── app.py             # API för att ta emot notifieringsanrop
+│   ├── Dockerfile         # Docker-konfiguration för notifieringstjänsten
+│   ├── requirements.txt   # Python dependencies
+│   ├── __init__.py        # Gör mappen till en Python-modul
+│
+│── database_service/      # Hanterar all databaslogik
+│   ├── database.py        # All kommunikation med PostgreSQL
+│   ├── models.py          # Datamodeller för kanaler och settings
+│   ├── migrations/        # (Valfritt) För att hantera databasändringar
+│   ├── __init__.py        # Gör mappen till en Python-modul
+│
+│── config/                # Konfigurationsfiler
+│   ├── .env               # Miljövariabler
+│   ├── settings.sql        # SQL-script för att skapa tabeller
+│
+│── docker-compose.yml      # Orkestrerar microservices i Docker
+│── README.md               # Dokumentation
+│── .gitignore              # Ignorerar filer som inte ska pushas
+
+
+
+
+
+
+Docker Commands
+
+Bygg containrar: 
+docker-compose build
+
+Starta tjänsten
+docker-compose up -d # -d = detached mode
+
+Verifiera att allt fungerar
+docker ps # kollar på att alla tjänster är igång
+
+Kolla att API:et är redo:
+docker exec -it monitor_service curl http://database_service_5000/health
+ska ge status: ok
+
+Kolla loggar
+Monitor service: docker logs monitor_service
+Database service: docker logs database_service
+
+Kolla innehåll i databasen: 
+docker exec -it postgres_db psql -U admin -d monitor -c "SELECT * FROM settings;"
+
+Stäng docker:
+Docker-compose down #stänger av och tar bort alla containrar, men behåller databasvolymerna. Om man startar med docker-compose up -d så finns all data kvar.
+
+docker-compose down -v # tar bort alla volymer inkl databasen- All data i databasen försvinner och måste åteskapas från init.sql
+
+
+docker-compose stop # pausar och kan startas igen med docker-compose start. 
+
