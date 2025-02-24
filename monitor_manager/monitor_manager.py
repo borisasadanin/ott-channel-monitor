@@ -55,14 +55,56 @@ class MonitorManager:
                 channel_id = channel['id']
                 container_name = f'monitor_service_{channel_id}'
                 
-                # Om containern finns men inte kör, ta bort den först
+                #ERSÄTTER STYCKET NEDANFÖR 
+                if channel_id in all_containers:
+                    container = all_containers[channel_id]
+                    
+                    #Kontrollera om containern körs, då ska vi inte göra något
+                    if container.status == "running":
+                        logger.info(f"✅ Container {container_name} körs redan, ingen åtgärd behövs.")
+                        continue  # Hoppa över denna kanal, containern körs redan
+
+                    # Om containern existerar men är stoppad, ta bort och starta om den
+                    try:
+                        container.remove(force=True)
+                        logger.info(f"🗑️ Tog bort stoppad container: {container_name}")
+                    except Exception as e:
+                        logger.error(f"❌ Kunde inte ta bort container {container_name}: {e}")
+
+
+                """# Om containern finns men inte kör, ta bort den först (ERSATT AV STYCKET OVANFÖR)
                 if channel_id in all_containers:
                     try:
                         all_containers[channel_id].remove(force=True)
                         logger.info(f"🗑️ Tog bort gammal container: {container_name}")
                     except Exception as e:
-                        logger.error(f"❌ Kunde inte ta bort gammal container {container_name}: {e}")
+                        logger.error(f"❌ Kunde inte ta bort gammal container {container_name}: {e}")"""
 
+
+
+                #ERSÄTTER STYCKET NEDANFÖR
+                if channel_id not in all_containers:
+                    try:
+                        container = self.docker_client.containers.run(
+                            'monitor_service_image',
+                            environment={
+                                'CHANNEL_ID': str(channel_id),
+                                'CHANNEL_URL': channel['url'],
+                                'DATABASE_SERVICE_URL': self.database_url
+                            },
+                            name=container_name,
+                            detach=True,
+                            network=self.docker_network
+                        )
+                        logger.info(f"✅ Startade ny övervakningscontainer för kanal {channel_id}")
+                    except Exception as e:
+                        logger.error(f"❌ Kunde inte starta övervakning av kanal {channel_id}: {e}")
+                else:
+                    logger.info(f"🔄 Container för kanal {channel_id} körs redan, hoppar över.")
+
+
+
+                """ERSATT AV STYCKET OVANFÖR
                 # Starta ny container
                 try:
                     container = self.docker_client.containers.run(
@@ -78,7 +120,7 @@ class MonitorManager:
                     )
                     logger.info(f"✅ Startade övervakning av kanal {channel_id}")
                 except Exception as e:
-                    logger.error(f"❌ Kunde inte starta övervakning av kanal {channel_id}: {e}")
+                    logger.error(f"❌ Kunde inte starta övervakning av kanal {channel_id}: {e}")"""
 
             # Ta bort containrar för borttagna kanaler
             for container_id in all_containers:

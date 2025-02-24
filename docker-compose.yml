@@ -64,21 +64,21 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGINT
 
-  monitor_service:
-    build: ./monitor_service
-    image: monitor_service_image
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - backend
-    depends_on:
-      database_service:
-        condition: service_healthy
-    stop_grace_period: 10s
-    stop_signal: SIGINT
+#  monitor_service:
+#    build: ./monitor_service
+#    image: monitor_service_image
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "10m"
+#        max-file: "3"
+#    networks:
+#      - backend
+#    depends_on:
+#      database_service:
+#        condition: service_healthy
+#    stop_grace_period: 10s
+#    stop_signal: SIGINT
 
 networks:
   backend:
